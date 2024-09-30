@@ -1,0 +1,5 @@
+DROP INDEX IF EXISTS ixd_group;
+DROP INDEX IF EXISTS idx_release_date;
+DROP INDEX IF EXISTS idx_song;
+
+DROP TABLE IF EXISTS songs;
