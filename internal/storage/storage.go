@@ -109,7 +109,7 @@ func (s *Storage) GetSongs(ctx context.Context, group, song, releaseDate string,
 func (s *Storage) AddSong(ctx context.Context, song model.Song) (model.Song, error) {
 	query := squirrel.Insert("songs").Columns("group_name", "song", "release_date", "text", "link").
 		Values(song.Group, song.Song, song.ReleaseDate, song.Text, song.Link).
-		Suffix("ON CONFLICT DO NOTHING RETURNING id, group_name, song, release_date, text, link;")
+		Suffix("ON CONFLICT (group_name, song) DO NOTHING RETURNING id, group_name, song, release_date, text, link;")
 
 	sqlString, args, err := query.PlaceholderFormat(squirrel.Dollar).ToSql()
 	if err != nil {
