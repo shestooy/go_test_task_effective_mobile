@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS songs(
     id SERIAL PRIMARY KEY,
     group_name VARCHAR(255) NOT NULL,
     song    VARCHAR(255) NOT NULL,
-    release_date DATE,
+    release_date TEXT,
     text TEXT,
     link VARCHAR(255) NOT NULL,
     UNIQUE (group_name, song)
