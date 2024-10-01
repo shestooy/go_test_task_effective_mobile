@@ -7,6 +7,42 @@ servers:
   - url: http://localhost:8080
     description: Local server
 paths:
+  /info:
+    get:
+      summary: Получить информацию о песне
+      description: Получение информации о песни по названию и автору
+      tags:
+        - info
+      parameters:
+        - name: group
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: song
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/info'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /songs:
     get:
       summary: Получить список песен
@@ -280,6 +316,24 @@ components:
         song:
           type: string
           example: Creep
+        releaseDate:
+          type: string
+          format: date
+          example: 1992-09-21
+        text:
+          type: string
+          example: |
+            When you were here before
+            Couldn't look you in the eye
+        link:
+          type: string
+          example: https://www.youtube.com/watch?v=XFkzRNyygfk
+    info:
+      type: object
+      required:
+        - group
+        - song
+      properties:
         releaseDate:
           type: string
           format: date

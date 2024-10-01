@@ -17,6 +17,63 @@ const docTemplate = `{
         }
     ],
     "paths": {
+		"/info": {
+            "get": {
+				"summary": "Получить информацию о песне",
+                "tags": ["info"],
+                "description": "Получение информации о песни по названию и автору",
+                "parameters": [
+                    {
+                        "name": "group",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "song",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ok",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/info"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка при получении списка песен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка при получении списка песен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/songs": {
             "get": {
                 "summary": "Получить список песен",
@@ -387,6 +444,25 @@ const docTemplate = `{
                     "link": {
                         "type": "string",
                         "example": "https://www.youtube.com/watch?v=Xsp3_a-PMTw"
+                    }
+                }
+            },
+			"info": {
+                "type": "object",
+                "required": ["group", "song"],
+                "properties": {
+                    "releaseDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "1992-09-21"
+                    },
+                    "text": {
+                        "type": "string",
+                        "example": "When you were here before\nCouldn't look you in the eye"
+                    },
+                    "link": {
+                        "type": "string",
+                        "example": "https://www.youtube.com/watch?v=XFkzRNyygfk"
                     }
                 }
             },
