@@ -90,7 +90,10 @@ func (r *Handler) AddSong(c echo.Context) error {
 	song, err := r.DB.AddSong(c.Request().Context(), song)
 	if err != nil {
 		r.log.Error(err)
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "this song is already exists"})
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "this song is already exists"})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
 	return c.JSON(http.StatusOK, song)
