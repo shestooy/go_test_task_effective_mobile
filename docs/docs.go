@@ -20,7 +20,7 @@ const docTemplate = `{
         "/songs": {
             "get": {
                 "summary": "Получить список песен",
-                "description": "Получение данных библиотеки с возможностью фильтрации по полям и пагинацией.",
+                "description": "Получение данных библиотеки с возможностью фильтрации по полям и пагинацией. Обязательно заполнить хотя бы 1 поле",
                 "tags": ["songs"],
                 "parameters": [
                     {
@@ -103,7 +103,7 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/Song"
+                                "$ref": "#/components/schemas/NewSong"
                             }
                         }
                     }
@@ -200,7 +200,7 @@ const docTemplate = `{
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/Song"
+                                "$ref": "#/components/schemas/UpdateReq"
                             }
                         }
                     }
@@ -211,7 +211,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Song"
+                                    "$ref": "#/components/schemas/UpdatedSong"
                                 }
                             }
                         }
@@ -278,6 +278,83 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/songs/{id}/verse": {
+            "get": {
+                "summary": "Получить куплет песни по ее ID",
+                "description": "Извлекает определенный куплет из песни по ее идентификатору. Если параметр verse не указан, будет возвращен первый куплет по умолчанию.",
+                "tags": ["songs"],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID песни",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "verse",
+                        "in": "query",
+                        "description": "Номер куплета",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное извлечение куплета",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "verse": {
+                                            "type": "string",
+                                            "example": "Ooh baby, don't you know I suffer?"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Неправильное ID песни",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Песня не найдена",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка обработки запроса",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -310,6 +387,91 @@ const docTemplate = `{
                     "link": {
                         "type": "string",
                         "example": "https://www.youtube.com/watch?v=Xsp3_a-PMTw"
+                    }
+                }
+            },
+			"NewSong": {
+                "type": "object",
+                "required": ["group", "song"],
+                "properties": {
+                    "group": {
+                        "type": "string",
+                        "example": "Muse"
+                    },
+                    "song": {
+                        "type": "string",
+                        "example": "Supermassive Black Hole"
+                    },
+                    "releaseDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2006-07-16"
+                    },
+                    "text": {
+                        "type": "string",
+                        "example": "Ooh baby, don't you know I suffer?\nOoh baby, can you hear me moan?"
+                    },
+                    "link": {
+                        "type": "string",
+                        "example": "https://www.youtube.com/watch?v=Xsp3_a-PMTw"
+                    }
+                }
+            },
+            "UpdateReq": {
+                "type": "object",
+                "required": ["group", "song"],
+                "properties": {
+                    "group": {
+                        "type": "string",
+                        "example": "Radiohead"
+                    },
+                    "song": {
+                        "type": "string",
+                        "example": "Creep"
+                    },
+                    "releaseDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "1992-09-21"
+                    },
+                    "text": {
+                        "type": "string",
+                        "example": "When you were here before\nCouldn't look you in the eye"
+                    },
+                    "link": {
+                        "type": "string",
+                        "example": "https://www.youtube.com/watch?v=XFkzRNyygfk"
+                    }
+                }
+            },
+            "UpdatedSong": {
+                "type": "object",
+                "required": ["group", "song"],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "group": {
+                        "type": "string",
+                        "example": "Radiohead"
+                    },
+                    "song": {
+                        "type": "string",
+                        "example": "Creep"
+                    },
+                    "releaseDate": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "1992-09-21"
+                    },
+                    "text": {
+                        "type": "string",
+                        "example": "When you were here before\nCouldn't look you in the eye"
+                    },
+                    "link": {
+                        "type": "string",
+                        "example": "https://www.youtube.com/watch?v=XFkzRNyygfk"
                     }
                 }
             },
