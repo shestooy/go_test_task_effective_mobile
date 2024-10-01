@@ -26,6 +26,7 @@ type IStorage interface {
 	DeleteSong(ctx context.Context, id string) error
 	UpdateSong(ctx context.Context, song model.Song) (model.Song, error)
 	GetSongVerseByID(ctx context.Context, id, verse int) (string, error)
+	GetInfo(ctx context.Context, group, song string) (model.Song, error)
 	Close() error
 }
 
@@ -36,6 +37,7 @@ type Storage struct {
 
 func (s *Storage) InitStorage(logger zap.SugaredLogger, EndPointDB string) error {
 	var err error
+	logger.Debug("Initializing storage with DB endpoint:", EndPointDB)
 	s.db, err = sql.Open("pgx", EndPointDB)
 	if err != nil {
 		s.logger.Info(zap.Error(err))
@@ -46,8 +48,10 @@ func (s *Storage) InitStorage(logger zap.SugaredLogger, EndPointDB string) error
 }
 
 func (s *Storage) initMigrations() error {
+	s.logger.Debug("Initializing migrations...")
 	driver, err := pgx.WithInstance(s.db, &pgx.Config{})
 	if err != nil {
+		s.logger.Info(zap.Error(err))
 		return err
 	}
 	m, err := migrate.NewWithDatabaseInstance("file://db/migrations", "postgres", driver)
@@ -55,18 +59,27 @@ func (s *Storage) initMigrations() error {
 		s.logger.Info(zap.Error(err))
 		return err
 	}
+	s.logger.Debug("Running migrations...")
 	if err = m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		s.logger.Info(zap.Error(err))
 		return err
 	}
+	s.logger.Debug("Migrations completed successfully")
 	return nil
 }
 
 func (s *Storage) Ping(ctx context.Context) error {
-	return s.db.PingContext(ctx)
+	s.logger.Debug("Pinging database...")
+	err := s.db.PingContext(ctx)
+	if err != nil {
+		s.logger.Info(zap.Error(err))
+	}
+	return err
 }
 
 func (s *Storage) GetSongs(ctx context.Context, group, song, releaseDate string, limit, offset int) ([]model.Song, error) {
+	s.logger.Debugw("Fetching songs with filters", "group", group, "song", song, "releaseDate", releaseDate, "limit", limit, "offset", offset)
+
 	query := squirrel.Select("*").From("songs").OrderBy("id").Limit(uint64(limit)).Offset(uint64(offset))
 
 	if group != "" {
@@ -86,6 +99,7 @@ func (s *Storage) GetSongs(ctx context.Context, group, song, releaseDate string,
 		s.logger.Info(zap.Error(err))
 		return nil, err
 	}
+	s.logger.Debug("Generated SQL:", sqlString, "args:", args)
 
 	rows, err := s.db.QueryContext(ctx, sqlString, args...)
 	if err != nil {
@@ -100,6 +114,7 @@ func (s *Storage) GetSongs(ctx context.Context, group, song, releaseDate string,
 		if err = rows.Scan(&song.ID, &song.Group, &song.Song, &song.ReleaseDate, &song.Text, &song.Link); err != nil {
 			return nil, err
 		}
+		s.logger.Debug("Scanned song:", song)
 		songs = append(songs, song)
 	}
 
@@ -107,6 +122,8 @@ func (s *Storage) GetSongs(ctx context.Context, group, song, releaseDate string,
 }
 
 func (s *Storage) AddSong(ctx context.Context, song model.Song) (model.Song, error) {
+	s.logger.Debugw("Adding new song", "song", song)
+
 	query := squirrel.Insert("songs").Columns("group_name", "song", "release_date", "text", "link").
 		Values(song.Group, song.Song, song.ReleaseDate, song.Text, song.Link).
 		Suffix("ON CONFLICT (group_name, song) DO NOTHING RETURNING id, group_name, song, release_date, text, link;")
@@ -116,6 +133,7 @@ func (s *Storage) AddSong(ctx context.Context, song model.Song) (model.Song, err
 		s.logger.Info(zap.Error(err))
 		return song, err
 	}
+	s.logger.Debug("Generated SQL:", sqlString, "args:", args)
 
 	row := s.db.QueryRowContext(ctx, sqlString, args...)
 	var addedSong model.Song
@@ -123,17 +141,21 @@ func (s *Storage) AddSong(ctx context.Context, song model.Song) (model.Song, err
 		s.logger.Info(zap.Error(err))
 		return song, err
 	}
+	s.logger.Debug("Added song:", addedSong)
 
 	return addedSong, nil
 }
 
 func (s *Storage) GetSongByID(ctx context.Context, id string) (model.Song, error) {
+	s.logger.Debug("Fetching song by ID:", id)
+
 	query := squirrel.Select("*").From("songs").Where(squirrel.Eq{"id": id})
 	sqlString, args, err := query.PlaceholderFormat(squirrel.Dollar).ToSql()
 	if err != nil {
 		s.logger.Info(zap.Error(err))
 		return model.Song{}, err
 	}
+	s.logger.Debug("Generated SQL:", sqlString, "args:", args)
 
 	row := s.db.QueryRowContext(ctx, sqlString, args...)
 	var song model.Song
@@ -141,23 +163,32 @@ func (s *Storage) GetSongByID(ctx context.Context, id string) (model.Song, error
 		s.logger.Info(zap.Error(err))
 		return song, err
 	}
+	s.logger.Debug("Fetched song:", song)
 
 	return song, nil
 }
 
 func (s *Storage) DeleteSong(ctx context.Context, id string) error {
+	s.logger.Debug("Deleting song by ID:", id)
+
 	query := squirrel.Delete("songs").Where(squirrel.Eq{"id": id})
 	sqlString, args, err := query.PlaceholderFormat(squirrel.Dollar).ToSql()
 	if err != nil {
 		s.logger.Info(zap.Error(err))
 		return err
 	}
+	s.logger.Debug("Generated SQL:", sqlString, "args:", args)
 
 	_, err = s.db.ExecContext(ctx, sqlString, args...)
+	if err != nil {
+		s.logger.Info(zap.Error(err))
+	}
 	return err
 }
 
 func (s *Storage) UpdateSong(ctx context.Context, song model.Song) (model.Song, error) {
+	s.logger.Debugw("Updating song", "song", song)
+
 	query := squirrel.Update("songs").
 		Set("group_name", song.Group).
 		Set("song", song.Song).
@@ -172,6 +203,7 @@ func (s *Storage) UpdateSong(ctx context.Context, song model.Song) (model.Song, 
 		s.logger.Info(zap.Error(err))
 		return song, err
 	}
+	s.logger.Debug("Generated SQL:", sqlString, "args:", args)
 
 	row := s.db.QueryRowContext(ctx, sqlString, args...)
 	var updatedSong model.Song
@@ -179,17 +211,21 @@ func (s *Storage) UpdateSong(ctx context.Context, song model.Song) (model.Song, 
 		s.logger.Info(zap.Error(err))
 		return song, err
 	}
+	s.logger.Debug("Updated song:", updatedSong)
 
 	return updatedSong, nil
 }
 
 func (s *Storage) GetSongVerseByID(ctx context.Context, id, verse int) (string, error) {
+	s.logger.Debug("Fetching song verse by ID:", id, "verse:", verse)
+
 	query := squirrel.Select("text").From("songs").Where(squirrel.Eq{"id": id})
 	sqlString, args, err := query.PlaceholderFormat(squirrel.Dollar).ToSql()
 	if err != nil {
 		s.logger.Info(zap.Error(err))
 		return "", err
 	}
+	s.logger.Debug("Generated SQL:", sqlString, "args:", args)
 
 	row := s.db.QueryRowContext(ctx, sqlString, args...)
 	var text string
@@ -197,6 +233,7 @@ func (s *Storage) GetSongVerseByID(ctx context.Context, id, verse int) (string, 
 		s.logger.Info(zap.Error(err))
 		return "", err
 	}
+	s.logger.Debug("Fetched song text:", text)
 
 	verses := strings.Split(text, "\n\n")
 
@@ -206,9 +243,37 @@ func (s *Storage) GetSongVerseByID(ctx context.Context, id, verse int) (string, 
 		return "", err
 	}
 
+	s.logger.Debug("Fetched verse:", verses[verse-1])
 	return verses[verse-1], nil
 }
 
+func (s *Storage) GetInfo(ctx context.Context, group, song string) (model.Song, error) {
+	s.logger.Debug("Fetching song info", "group", group, "song", song)
+
+	query := squirrel.Select("release_date", "text", "link").From("songs").Where(squirrel.Eq{"group_name": group, "song": song})
+	sqlString, args, err := query.PlaceholderFormat(squirrel.Dollar).ToSql()
+	if err != nil {
+		s.logger.Info(zap.Error(err))
+		return model.Song{}, err
+	}
+	s.logger.Debug("Generated SQL:", sqlString, "args:", args)
+
+	row := s.db.QueryRowContext(ctx, sqlString, args...)
+	var res model.Song
+	err = row.Scan(&res.ReleaseDate, &res.Text, &res.Link)
+	if err != nil {
+		s.logger.Info(zap.Error(err))
+	}
+	s.logger.Debug("Fetched song info:", res)
+
+	return res, err
+}
+
 func (s *Storage) Close() error {
-	return s.db.Close()
+	s.logger.Debug("Closing database connection...")
+	err := s.db.Close()
+	if err != nil {
+		s.logger.Info(zap.Error(err))
+	}
+	return err
 }

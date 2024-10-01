@@ -23,23 +23,10 @@ type Handler struct {
 func NewHandler(log *zap.SugaredLogger, limitParam, pageParam, verseParam int, endPointDB string) (*Handler, error) {
 	db := &storage.Storage{}
 	c := &Handler{log: log, DB: db, limitParamDefault: limitParam, pageParamDefault: pageParam, verseParamDefault: verseParam}
+	log.Debug("Initializing new handler with DB endpoint:", endPointDB)
 	return c, c.DB.InitStorage(*log, endPointDB)
 }
 
-// GetSongs
-// @Summary Получить список песен
-// @Description Получение данных библиотеки с возможностью фильтрации по полям (название группы, название песни, дата выпуска) и пагинацией.
-// @Tags songs
-// @Accept json
-// @Produce json
-// @Param group query string false "Фильтрация по названию группы"
-// @Param song query string false "Фильтрация по названию песни"
-// @Param release_date query string false "Фильтрация по дате выпуска (ГГГГ-ММ-ДД)"
-// @Param page query int false "Номер страницы" default(1)
-// @Param limit query int false "Количество элементов на странице" default(10)
-// @Success 200 {array} model.Song "Список песен"
-// @Failure 400 {object} map[string]string "Ошибка при получении списка песен"
-// @Router /songs [get]
 func (r *Handler) GetSongs(c echo.Context) error {
 	group := c.QueryParam("group")
 	song := c.QueryParam("song")
@@ -52,16 +39,16 @@ func (r *Handler) GetSongs(c echo.Context) error {
 	if err != nil || page < 1 {
 		page = r.limitParamDefault
 	}
-
 	limit, err := strconv.Atoi(limitParam)
 	if err != nil || limit < 1 {
 		limit = r.pageParamDefault
 	}
 	offset := (page - 1) * limit
 
+	r.log.Debugw("Fetching songs", "group", group, "song", song, "releaseDate", releaseDate, "limit", limit, "offset", offset)
 	songs, err := r.DB.GetSongs(c.Request().Context(), group, song, releaseDate, limit, offset)
 	if err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Failed to fetch songs", "error", err)
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Failed to fetch songs",
 		})
@@ -69,53 +56,34 @@ func (r *Handler) GetSongs(c echo.Context) error {
 	return c.JSON(http.StatusOK, songs)
 }
 
-// AddSong
-// @Summary Добавить новую песню
-// @Description Добавление новой песни в базу данных.
-// @Tags songs
-// @Accept json
-// @Produce json
-// @Param song body model.Song true "Данные новой песни"
-// @Success 200 {object} model.Song "Добавленная песня"
-// @Failure 400 {object} map[string]string "Некорректный запрос"
-// @Failure 500 {object} map[string]string "Ошибка при добавлении песни"
-// @Router /songs [post]
 func (r *Handler) AddSong(c echo.Context) error {
 	var song model.Song
 	if err := c.Bind(&song); err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Failed to bind song", "error", err)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
+	r.log.Debugw("Adding new song", "song", song)
 	song, err := r.DB.AddSong(c.Request().Context(), song)
 	if err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Failed to add song", "error", err)
 		if errors.Is(err, sql.ErrNoRows) {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "this song is already exists"})
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "this song already exists"})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
+	r.log.Debug("Song added successfully", "song", song)
 	return c.JSON(http.StatusOK, song)
 }
 
-// GetSongByID
-// @Summary Получить информацию о песне по ID
-// @Description Извлечение песни по её уникальному идентификатору.
-// @Tags songs
-// @Accept json
-// @Produce json
-// @Param id path int true "ID песни"
-// @Success 200 {object} model.Song "Информация о песне"
-// @Failure 404 {object} map[string]string "Песня не найдена"
-// @Failure 500 {object} map[string]string "Ошибка при извлечении песни"
-// @Router /songs/{id} [get]
 func (r *Handler) GetSongByID(c echo.Context) error {
 	id := c.Param("id")
+	r.log.Debug("Fetching song by ID", "id", id)
 
 	song, err := r.DB.GetSongByID(c.Request().Context(), id)
 	if err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Failed to fetch song by ID", "id", id, "error", err)
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusNotFound, map[string]string{
 				"error": "Song not found",
@@ -126,28 +94,15 @@ func (r *Handler) GetSongByID(c echo.Context) error {
 		})
 	}
 
+	r.log.Debug("Song fetched successfully", "song", song)
 	return c.JSON(http.StatusOK, song)
 }
 
-// UpdateSong
-// @Summary Обновить песню
-// @Description Обновление существующей песни по её ID.
-// @Tags songs
-// @Accept json
-// @Produce json
-// @Param id path int true "ID песни"
-// @Param song body model.Song true "Обновленные данные песни"
-// @Success 200 {object} model.Song "Обновленная песня"
-// @Failure 400 {object} map[string]string "Некорректный запрос"
-// @Failure 404 {object} map[string]string "Песня не найдена"
-// @Failure 500 {object} map[string]string "Ошибка при обновлении песни"
-// @Router /songs/{id} [put]
 func (r *Handler) UpdateSong(c echo.Context) error {
 	idStr := c.Param("id")
-
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Invalid song ID", "id", idStr, "error", err)
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid song ID",
 		})
@@ -155,14 +110,15 @@ func (r *Handler) UpdateSong(c echo.Context) error {
 
 	var song model.Song
 	if err = c.Bind(&song); err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Failed to bind song", "error", err)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 	song.ID = id
 
+	r.log.Debugw("Updating song", "song", song)
 	song, err = r.DB.UpdateSong(c.Request().Context(), song)
 	if err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Failed to update song", "id", id, "error", err)
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusNotFound, map[string]string{
 				"error": "Song not found",
@@ -173,26 +129,17 @@ func (r *Handler) UpdateSong(c echo.Context) error {
 		})
 	}
 
+	r.log.Debug("Song updated successfully", "song", song)
 	return c.JSON(http.StatusOK, song)
 }
 
-// DeleteSong
-// @Summary Удалить песню
-// @Description Удаление песни по её ID.
-// @Tags songs
-// @Accept json
-// @Produce json
-// @Param id path int true "ID песни"
-// @Success 204 {string} string "Песня успешно удалена"
-// @Failure 404 {object} map[string]string "Песня не найдена"
-// @Failure 500 {object} map[string]string "Ошибка при удалении песни"
-// @Router /songs/{id} [delete]
 func (r *Handler) DeleteSong(c echo.Context) error {
 	id := c.Param("id")
+	r.log.Debug("Deleting song by ID", "id", id)
 
 	err := r.DB.DeleteSong(c.Request().Context(), id)
 	if err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Failed to delete song", "id", id, "error", err)
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusNotFound, map[string]string{
 				"error": "Song not found",
@@ -205,26 +152,14 @@ func (r *Handler) DeleteSong(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// GetSongVerseByID
-// @Summary Получить текст куплета песни по ID
-// @Description Извлечение текста определенного куплета песни по её ID. Можно передать номер куплета, по умолчанию извлекается первый куплет.
-// @Tags songs
-// @Accept json
-// @Produce json
-// @Param id path int true "ID песни"
-// @Param verse query int false "Номер куплета" default(1)
-// @Success 200 {object} map[string]string "Текст куплета"
-// @Failure 400 {object} map[string]string "Некорректный ID песни"
-// @Failure 404 {object} map[string]string "Песня не найдена"
-// @Failure 500 {object} map[string]string "Ошибка при получении куплета"
-// @Router /songs/{id}/verse [get]
 func (r *Handler) GetSongVerseByID(c echo.Context) error {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Invalid song ID", "id", idStr, "error", err)
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid song ID"})
+			"error": "Invalid song ID",
+		})
 	}
 
 	verseStr := c.QueryParam("verse")
@@ -233,19 +168,42 @@ func (r *Handler) GetSongVerseByID(c echo.Context) error {
 		verse = r.verseParamDefault
 	}
 
+	r.log.Debugw("Fetching song verse", "id", id, "verse", verse)
 	verseText, err := r.DB.GetSongVerseByID(c.Request().Context(), id, verse)
-
 	if err != nil {
-		r.log.Error(err)
+		r.log.Errorw("Failed to fetch song verse", "id", id, "verse", verse, "error", err)
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Song not found"})
+				"error": "Song not found",
+			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to retrieve verse"})
+			"error": "Failed to retrieve verse",
+		})
 	}
 
+	r.log.Debug("Verse fetched successfully", "verseText", verseText)
 	return c.JSON(http.StatusOK, map[string]string{
 		"verse": verseText,
 	})
+}
+
+func (r *Handler) GetInfo(c echo.Context) error {
+	group := c.QueryParam("group")
+	song := c.QueryParam("song")
+	if group == "" || song == "" {
+		r.log.Errorw("Group or song parameters are missing")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Group or song are required"})
+	}
+
+	r.log.Debugw("Fetching song info", "group", group, "song", song)
+	info, err := r.DB.GetInfo(c.Request().Context(), group, song)
+	if err != nil {
+		r.log.Errorw("Failed to fetch song info", "group", group, "song", song, "error", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to fetch song info",
+		})
+	}
+	r.log.Debug("Song info fetched successfully", "info", info)
+	return c.JSON(http.StatusOK, info)
 }
