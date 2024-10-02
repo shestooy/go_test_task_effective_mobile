@@ -20,7 +20,7 @@ type logEntry struct {
 	BytesOut int64  `json:"bytes_out"`
 }
 
-func GetLogg(logger zap.SugaredLogger) echo.MiddlewareFunc {
+func GetLogg(logger *zap.SugaredLogger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) (err error) {
 			req := c.Request()

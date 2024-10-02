@@ -17,7 +17,7 @@ import (
 )
 
 type IStorage interface {
-	InitStorage(logger zap.SugaredLogger, EndPointDB string) error
+	InitStorage(logger *zap.SugaredLogger, EndPointDB string) error
 	initMigrations() error
 	Ping(ctx context.Context) error
 	GetSongs(ctx context.Context, group, song, releaseDate string, limit, offset int) ([]model.Song, error)
@@ -32,10 +32,10 @@ type IStorage interface {
 
 type Storage struct {
 	db     *sql.DB
-	logger zap.SugaredLogger
+	logger *zap.SugaredLogger
 }
 
-func (s *Storage) InitStorage(logger zap.SugaredLogger, EndPointDB string) error {
+func (s *Storage) InitStorage(logger *zap.SugaredLogger, EndPointDB string) error {
 	var err error
 	logger.Debug("Initializing storage with DB endpoint:", EndPointDB)
 	s.db, err = sql.Open("pgx", EndPointDB)

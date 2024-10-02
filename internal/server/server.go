@@ -42,7 +42,7 @@ func New(logLvl, endPointServer, endPointDB string, limitParam, pageParam, verse
 
 	ZapLog.Debug("Applying middlewares")
 
-	e.Use(middlewares.GetLogg(*ZapLog))
+	e.Use(middlewares.GetLogg(ZapLog))
 	e.Use(middleware.Gzip())
 
 	ZapLog.Debug("Defining routes")

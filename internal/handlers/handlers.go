@@ -24,7 +24,7 @@ func NewHandler(log *zap.SugaredLogger, limitParam, pageParam, verseParam int, e
 	db := &storage.Storage{}
 	c := &Handler{log: log, DB: db, limitParamDefault: limitParam, pageParamDefault: pageParam, verseParamDefault: verseParam}
 	log.Debug("Initializing new handler with DB endpoint:", endPointDB)
-	return c, c.DB.InitStorage(*log, endPointDB)
+	return c, c.DB.InitStorage(log, endPointDB)
 }
 
 func (r *Handler) GetSongs(c echo.Context) error {
