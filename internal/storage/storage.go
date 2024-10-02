@@ -40,7 +40,7 @@ func (s *Storage) InitStorage(logger zap.SugaredLogger, EndPointDB string) error
 	logger.Debug("Initializing storage with DB endpoint:", EndPointDB)
 	s.db, err = sql.Open("pgx", EndPointDB)
 	if err != nil {
-		s.logger.Info(zap.Error(err))
+		logger.Info(zap.Error(err))
 		return err
 	}
 	s.logger = logger
